@@ -23,6 +23,7 @@ def train_model(input_df, target, test_size, model_name, features_to_drop):
     path = '../data/' + input_df + '.csv'
 
     data = pd.read_csv(path, index_col=0)
+    data = data.dropna()
     data = data.drop(features_to_drop, axis=1)
 
     metrics = ['TSV','TPV','TCV','TSL']
@@ -59,6 +60,7 @@ def train_model(input_df, target, test_size, model_name, features_to_drop):
 def generate_cfs_total(input_df_T, target_T, radio_T, predefined_T, custom_T, dropped_features_T, freeze_features_T, model_T):
     path = '../data/' + input_df_T + '.csv'
     data = pd.read_csv(path)
+    data = data.dropna()
     model = pickle.load(open('../models/' + model_T + '.pkl', 'rb'))
     data = data.drop(dropped_features_T, axis=1)
     metrics = ['TSV','TPV','TCV','TSL']
@@ -73,7 +75,7 @@ def generate_cfs_total(input_df_T, target_T, radio_T, predefined_T, custom_T, dr
                                                     test_size=0.2,
                                                     random_state=0)
 
-    always_immutable = ['AvgMaxDailyTemp','AvgMinDailyTemp','School','DAY','StartTime']
+    always_immutable = ['AvgMaxDailyTemp','AvgMinDailyTemp','School','StartTime']
     freezed = always_immutable + freeze_features_T + [target_T[0]]
 
     features_to_vary = data.columns.difference(freezed).to_list()
@@ -81,7 +83,7 @@ def generate_cfs_total(input_df_T, target_T, radio_T, predefined_T, custom_T, dr
     d = dice_ml.Data(dataframe=data, continuous_features=features, outcome_name=target_T[0])
     m = dice_ml.Model(model=model, backend='sklearn', model_type='regressor')
 
-    exp = dice_ml.Dice(d, m, method='genetic')
+    exp = dice_ml.Dice(d, m, method='random')
 
     if radio_T == 'Predefined':
         random_index = random.randint(0, len(x_train-2))
@@ -143,10 +145,11 @@ with gr.Blocks() as demo:
         dropped_features_T = gr.CheckboxGroup(['SwC', 'MC', 'Grade', 'Age', 'Gender'],
                                             label='Features to Drop', info='Select the features that are dropped from feature set')
         
-        freeze_features_T = gr.CheckboxGroup(['SchoolType','StartTime','AvgIndoorRelativeHumidity',
+        freeze_features_T = gr.CheckboxGroup(['AvgIndoorRelativeHumidity',
                      'IndoorTempDuringSurvey','Grade','Age','Gender','FormalClothing','TotalCLOwithChair'],
                      info = 'Select the features to be freezed to generate CFs')
         model_T = gr.Dropdown(models, label='Model', info='Select the model to generate CFs')
+        output_T = gr.DataFrame()
         button_cf_T = gr.Button(label="Generate CFs")
 
     with gr.Tab('Counterfactuals-Individual'):
@@ -165,7 +168,7 @@ with gr.Blocks() as demo:
         dropped_features_I = gr.CheckboxGroup(['SwC', 'MC', 'Grade', 'Age', 'Gender'], 
                                             label='Features to Drop', info='Select the features that are dropped from feature set')
         
-        freeze_features_I = gr.CheckboxGroup(['SchoolType','StartTime','AvgIndoorRelativeHumidity','IndoorTempDuringSurvey',
+        freeze_features_I = gr.CheckboxGroup(['AvgIndoorRelativeHumidity','IndoorTempDuringSurvey',
                                             'Grade','Age','Gender', 'FormalClothing','Pant','Trackpant','Halfshirt','Blazer','Jacket','Skirt',
                                             'FullShirt','HalfSweater','Tshirt','Socks','Thermal','Vest','FullSweater','SwC','MC'],
                                             info='Select the features to be freezed to generate CFs')
@@ -178,6 +181,6 @@ with gr.Blocks() as demo:
     button_model.click(train_model, [input_df, target, test_size, model_name, features_to_drop], outputs=model_output)
     button_cf_T.click(generate_cfs_total, [input_df_T, target_T, radio_T, predefined_T, 
                                            custom_T, dropped_features_T, freeze_features_T, model_T],
-                                           outputs=output_vis)
+                                           outputs=output_T)
 
 demo.launch(share=True)
