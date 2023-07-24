@@ -1,3 +1,4 @@
+import glob
 import os
 import pickle
 import random
@@ -94,7 +95,20 @@ def generate_cfs_total(input_df_T, target_T, radio_T, predefined_T, custom_T, dr
         query_instances = custom_T
     
     dice_exp = exp.generate_counterfactuals(query_instances, total_CFs=4, desired_range=[0.0, 2.0], features_to_vary=features_to_vary)
-    return dice_exp.visualize_as_dataframe(show_only_changes=True)
+    # Save generated counterfactual examples to disk
+    for i in range(len(dice_exp.cf_examples_list)):
+        if dice_exp.cf_examples_list[i].final_cfs_df is not None:
+            dice_exp.cf_examples_list[i].final_cfs_df.to_csv(path_or_buf=f'c{i}.csv', index=False)
+    
+    df = pd.concat(
+        [
+        pd.read_csv(filename).assign(source=filename)
+        for filename in glob.glob('*.csv')
+        ], 
+        ignore_index=True
+    )
+
+    return [query_instances, df]
 
 
 def generate_cfs_individual(input_df_I, target_I, radio_I, predefined_I, custom_I, dropped_features_I, freeze_features_I, model_I):
@@ -150,6 +164,7 @@ with gr.Blocks() as demo:
                      info = 'Select the features to be freezed to generate CFs')
         model_T = gr.Dropdown(models, label='Model', info='Select the model to generate CFs')
         output_T = gr.DataFrame()
+        output_T1 = gr.DataFrame()
         button_cf_T = gr.Button(label="Generate CFs")
 
     with gr.Tab('Counterfactuals-Individual'):
@@ -181,6 +196,6 @@ with gr.Blocks() as demo:
     button_model.click(train_model, [input_df, target, test_size, model_name, features_to_drop], outputs=model_output)
     button_cf_T.click(generate_cfs_total, [input_df_T, target_T, radio_T, predefined_T, 
                                            custom_T, dropped_features_T, freeze_features_T, model_T],
-                                           outputs=output_T)
+                                           outputs=[output_T, output_T1])
 
 demo.launch(share=True)
